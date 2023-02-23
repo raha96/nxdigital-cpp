@@ -29,11 +29,11 @@ namespace circuit {
 
     template <typename T>
     class _vec_graph : public vector_interface<T> {
-        friend class graph;
+        friend class graph_base;
     };
     template <typename Ti, typename To>
     class _map_graph : public map_interface<Ti,To> {
-        friend class graph;
+        friend class graph_base;
     };
 
     typedef std::pair<std::string,std::string> property_t;
@@ -45,7 +45,7 @@ namespace circuit {
     };
 
     //template <typename T> 
-    class graph {
+    class graph_base {
     protected: 
         typedef node_base* NT;
         typedef _vec_graph<NT> _vec;
@@ -54,14 +54,15 @@ namespace circuit {
         _map_graph<NT,_prop> adj, pred;
         //inline void add_child(T* item) { adj.data.push_back(item); }
         //inline void add_parent(T* item) { pred.data.push_back(item); }
-        
+        inline void add_node(auto node) {  }
     protected:
         std::vector<std::any> nodes;
+        // Must be overriden on inheritance
+        enum types { _INT };
         // Used for casting - _typemap keeps account of the type of each element
-        enum types { INT };
-        std::map<void*,unsigned> _typemap;
+        std::map<void*,types> _typemap;
         // _ptrcast casts each element based on the corresponding _typemap value.
-        // Conceptually it's virtual, but virtual functions can't return auto, so.
+        // These functions are conceptually virtual, but virtual functions can't return auto, so.
         auto _ptrcast(void* node) { return node; };
     };
 }
