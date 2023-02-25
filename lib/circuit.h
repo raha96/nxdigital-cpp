@@ -8,12 +8,14 @@
 
 namespace circuit {
     enum _net_type {
-        IN, OUT, INOUT, STATIC0, STATIC1
+        INT, IN, OUT, INOUT, STATIC0, STATIC1
     };
     enum _net_val {
         NV_U, NV_Z, NV_X, NV_0, NV_1
     };
     struct portmap_t {
+        portmap_t() {}
+        portmap_t(std::string port, std::string net) : port(port), net(net) {}
         std::string port, net;
     };
 
@@ -48,21 +50,21 @@ namespace circuit {
         std::string name() { return _name; }
         void set_name(std::string name) { _name = name; }
         void add_net(std::string name, _net_type type) 
-            { assert(is_valid(name)); net_list.data.push_back(net_t(name, type)); regnode(name, net_list.last()); }
+            { assert(is_valid(name)); net_list.data.push_back(net_t(name, type)); regnet(name); }
         void add_module(std::string name, std::string type) 
-            { assert(is_valid(name)); module_list.data.push_back(module_t(name, type)); regnode(name, module_list.last()); std::cout<<module_list.last() << " " << name << std::endl; }
+            { assert(is_valid(name)); module_list.data.push_back(module_t(name, type)); regmodule(name); }
         // Instead of exposing the maps themselves as is the case in the Python version, here we use generator functions
         // so we can overload.
         auto adj(net_t& net) {
             std::map<module_t*,std::string> out;
-            std::cout << net.name << std::endl;
-            for (auto edge : edges[net.name]) {
-                out[(module_t*)name_registration[edge.first]] = edge.second;
-                std::cout << edge.first << " " << edge.second << std::endl;
-                std::cout << ((module_t*)name_registration[edge.first]) << std::endl;
-                std::cout << ((module_t*)name_registration[edge.first])->name << std::endl;
-            }
-            std::cout << "DONE" << std::endl;
+            for (auto edge : edges[net.name])
+                out[(module_t*)getnode(edge.first)] = edge.second;
+            return out;
+        }
+        auto adj(module_t& module) {
+            std::map<net_t*, std::string> out;
+            for (auto edge : edges[module.name])
+                out[(net_t*)getnode(edge.first)] = edge.second;
             return out;
         }
         void add_connection(net_t& net, module_t& module, std::string port) { edges[net.name][module.name] = port; }
@@ -70,21 +72,24 @@ namespace circuit {
         void add_connection(std::string u, std::string v, std::string port) { edges[u][v] = port; }
         // Get the *local* port name corresponding to a net (the name of the port of the module connected to the net)
         std::string get_port(std::string u, std::string v) { return edges[u][v]; }
-    //private:
+    private:
         std::string _name;
-        // name_registration is meant to keep account of all nodes by name to allow higher levels of abstraction with low cost.
-        std::map<std::string,void*> name_registration;
-        void regnode(std::string name, auto node) { name_registration[name] = node; }
         // used_name and is_valid must be called for adding each node to ensure unique names in an efficient manner.
         std::map<std::string,bool> used_name;
         bool is_valid(std::string name) { if (used_name[name]) return false; used_name[name] = true; return true; }
         // The connection data is stored in edges as v -> {u -> port(u)}
         std::map<std::string,std::map<std::string,std::string>> edges;
+        // name_registration is meant to keep account of all nodes by name to allow higher levels of abstraction with low cost.
+        std::map<std::string,int> _name_registration_addr;
+        std::map<std::string,bool> _name_registration_isnet;
+        void regnet(std::string name) { _name_registration_addr[name] = net_list.size()-1; _name_registration_isnet[name] = true; }
+        void regmodule(std::string name) { _name_registration_addr[name] = module_list.size()-1; _name_registration_isnet[name] = false; }
+        void* getnode(std::string name) { if (_name_registration_isnet[name]) return &net_list[_name_registration_addr[name]];
+                                                                              return &module_list[_name_registration_addr[name]]; }
     };
 }
 
 #endif
 
 // NOTE:
-// <overline>It seems like use of vector iterators alters the addresses to std::vector items, causing segfault in some cases.</overline>
-// The culprit seems to be pass by reference? Probably I'm wrong.
+// Pointers to std::vector items change when the vector is resized.
