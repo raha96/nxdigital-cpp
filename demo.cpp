@@ -4,6 +4,7 @@
 
 #include "lib/circuit.h"
 #include "lib/verilog.h"
+#include "lib/bench.h"
 
 using namespace std;
 
@@ -28,9 +29,11 @@ circuit::circuit ha() {
 }
 
 int main() {
-    circuit::circuit cir = ha();
-    std::string verilog_code = circuit::verilog::dump(cir, false);
-    std::cout << verilog_code;
+    //circuit::circuit cir = ha();
+    //std::string verilog_code = circuit::verilog::dump(cir, false);
+    //std::cout << verilog_code;
+
+    circuit::circuit cir = circuit::bench::load("sample/c1355.bench");
 
     return 0;
 }
