@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <regex>
+#include <algorithm>
 
 #include "circuit.h"
 
@@ -18,7 +19,9 @@
 namespace circuit::bench {
     namespace _private {
         const std::regex re_io("\\s*(input|output)\\s*\\((\\w+)\\)\\s*", std::regex_constants::icase);
-        const std::regex re_gate("\\s*(\\w+)\\s*=\\s*(\\w+)\\s*\\(\\s*(\\w+)\\s*(,\\s*(\\w+)\\s*)*\\)\\s*", std::regex_constants::icase);
+        const std::regex re_gate("\\s*(\\w+)\\s*=\\s*(\\w+)\\s*\\(([\\w\\s,]+)\\)\\s*", std::regex_constants::icase);
+        const std::regex re_gate_inputs("\\w+", std::regex_constants::icase);
+        const std::regex re_file_basename("(\\w+)\\.bench", std::regex_constants::icase);
 
         struct _ret_io {
             ::circuit::_net_type type;
@@ -66,45 +69,72 @@ namespace circuit::bench {
                 out.type = tolower(match[2].str());
                 // The output
                 out.conns.push_back(match[1].str());
-                // The first input
-                out.conns.push_back(match[3].str());
-                // The rest of the inputs
-                // In this loop we skip every other net name, as each ", [NET]" generates two regex matches ("NET" & ", NET")
-                for (int i = 5; i < match.size(); i += 2)
-                    out.conns.push_back(match[i].str());
-                if (match[1].str() == "G980gat") {
-                    std::cout << "===============\n";
-                    for (auto s : match) {
-                        std::cout << s.str() << std::endl;
-                    }
-                    std::cout << "===============\n";
+                // Traverse the input list
+                std::string inputs = match[3].str();
+                std::smatch sm;
+                while (std::regex_search(inputs, sm, _private::re_gate_inputs)) {
+                    out.conns.push_back(sm.str());
+                    inputs = sm.suffix();
                 }
-                if (match.size() > 7)
-                    std::cout << match.size() << std::endl;
             }
             return out;
+        }
+
+        std::string gatename(int gatenum, int digits=4) {
+            std::string out = "";
+            for (int i = 0; i < digits; i++) {
+                out += char('0' + (gatenum % 10));
+                gatenum /= 10;
+            }
+            std::reverse(out.begin(), out.end());
+            return "G" + out;
+        }
+
+        std::string file_basename(std::string name) {
+            // Extract base name. Used for choosing the module's name.
+            std::cmatch match;
+            std::regex_search(name.c_str(), match, re_file_basename);
+            return match[1].str();
         }
     }
 
     ::circuit::circuit load(std::string path) {
         ::circuit::circuit _circuit;
-        std::fstream fin(path);
+        std::fstream fin(path, std::ios::in);
         std::string line;
-        int cnt = 5;
+        std::map<std::string,bool> wire_declared;
+        std::vector<std::string> ionames;
+        _circuit.set_name(_private::file_basename(path));
+        int gatecnt = 1;
         while (std::getline(fin, line)) {
             auto isio = _private::process_io(line);
             auto isgate = _private::process_gate(line);
             if (isio.name != "") {
                 _circuit.add_net(isio.name, isio.type);
+                ionames.push_back(isio.name);
             }
             if (isgate.type != "") {
-                if (isgate.conns.size() > 2) {
-                    //std::cout << isgate.type << std::endl;
-                    //std::cout << ::circuit::string_utils::join("|", isgate.conns) << std::endl;
+                std::string name = _private::gatename(gatecnt);
+                char port = 'a';
+                gatecnt++;
+                _circuit.add_module(name, isgate.type);
+                _circuit.add_connection(isgate.conns[0], name, "y");
+                wire_declared[isgate.conns[0]] = false;
+                for (int i = 1; i < isgate.conns.size(); i++) {
+                    _circuit.add_connection(name, isgate.conns[i], std::string(1, port));
+                    wire_declared[isgate.conns[i]] = false;
+                    port++;
                 }
             }
         }
         fin.close();
+        // Explicitly define the implicit wires
+        for (int i = 0; i < ionames.size(); i++)
+            wire_declared[ionames[i]] = true;
+        for (auto isdecl : wire_declared) {
+            if (!isdecl.second)
+                _circuit.add_net(isdecl.first, ::circuit::INT);
+        }
         return _circuit;
     }
 }

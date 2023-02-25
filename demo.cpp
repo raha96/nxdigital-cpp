@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 
 #define _NX_DEBUG
 
@@ -34,6 +35,9 @@ int main() {
     //std::cout << verilog_code;
 
     circuit::circuit cir = circuit::bench::load("sample/c1355.bench");
+    std::fstream fout("sample/c1355.v", std::ios::out);
+    fout << circuit::verilog::dump(cir, false) << std::endl;
+    fout.close();
 
     return 0;
 }
