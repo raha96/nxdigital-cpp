@@ -67,8 +67,21 @@ namespace circuit {
                 out[(net_t*)getnode(edge.first)] = edge.second;
             return out;
         }
-        void add_connection(net_t& net, module_t& module, std::string port) { edges[net.name][module.name] = port; }
-        void add_connection(module_t& module, net_t& net, std::string port) { edges[module.name][net.name] = port; }
+        auto pred(module_t& module) {
+            std::map<net_t*, std::string> out;
+            for (auto src : edges_reverse[module.name]) {
+                out[(net_t*)getnode(src)] = edges[src][module.name];
+            }
+            return out;
+        }
+        void add_connection(net_t& net, module_t& module, std::string port) {
+            edges[net.name][module.name] = port;
+            edges_reverse[module.name].push_back(net.name);
+        }
+        void add_connection(module_t& module, net_t& net, std::string port) {
+            edges[module.name][net.name] = port;
+            edges_reverse[net.name].push_back(module.name);
+        }
         void add_connection(std::string u, std::string v, std::string port) { edges[u][v] = port; }
         // Get the *local* port name corresponding to a net (the name of the port of the module connected to the net)
         std::string get_port(std::string u, std::string v) { return edges[u][v]; }
@@ -79,6 +92,7 @@ namespace circuit {
         bool is_valid(std::string name) { if (used_name[name]) return false; used_name[name] = true; return true; }
         // The connection data is stored in edges as v -> {u -> port(u)}
         std::map<std::string,std::map<std::string,std::string>> edges;
+        std::map<std::string,std::vector<std::string>> edges_reverse;
         // name_registration is meant to keep account of all nodes by name to allow higher levels of abstraction with low cost.
         std::map<std::string,int> _name_registration_addr;
         std::map<std::string,bool> _name_registration_isnet;
