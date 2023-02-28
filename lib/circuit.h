@@ -69,20 +69,31 @@ namespace circuit {
         }
         auto pred(module_t& module) {
             std::map<net_t*, std::string> out;
+            //std::cout << module.name << std::endl;
+            int cnt = 0;
             for (auto src : edges_reverse[module.name]) {
                 out[(net_t*)getnode(src)] = edges[src][module.name];
+                cnt++;
             }
+            if (cnt > 1)
+                std::cerr << "ZX " << cnt << std::endl;
             return out;
         }
+        void add_connection(std::string u, std::string v, std::string port) {
+            edges[u][v] = port;
+            auto it = edges_reverse.find(v);
+            if (it == edges_reverse.end()) {
+                std::vector<std::string> init;
+                edges_reverse[v] = init;
+            }
+            edges_reverse[v].push_back(u);
+        }
         void add_connection(net_t& net, module_t& module, std::string port) {
-            edges[net.name][module.name] = port;
-            edges_reverse[module.name].push_back(net.name);
+            add_connection(net.name, module.name, port);
         }
         void add_connection(module_t& module, net_t& net, std::string port) {
-            edges[module.name][net.name] = port;
-            edges_reverse[net.name].push_back(module.name);
+            add_connection(module.name, net.name, port);
         }
-        void add_connection(std::string u, std::string v, std::string port) { edges[u][v] = port; }
         // Get the *local* port name corresponding to a net (the name of the port of the module connected to the net)
         std::string get_port(std::string u, std::string v) { return edges[u][v]; }
     private:
