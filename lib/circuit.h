@@ -69,14 +69,9 @@ namespace circuit {
         }
         auto pred(module_t& module) {
             std::map<net_t*, std::string> out;
-            //std::cout << module.name << std::endl;
-            int cnt = 0;
             for (auto src : edges_reverse[module.name]) {
                 out[(net_t*)getnode(src)] = edges[src][module.name];
-                cnt++;
             }
-            if (cnt > 1)
-                std::cerr << "ZX " << cnt << std::endl;
             return out;
         }
         void add_connection(std::string u, std::string v, std::string port) {

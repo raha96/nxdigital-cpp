@@ -4,6 +4,7 @@
 #include <fstream>
 #include <regex>
 #include <algorithm>
+#include <cassert>
 
 #include "circuit.h"
 
@@ -110,18 +111,20 @@ namespace circuit::bench {
             auto isio = _private::process_io(line);
             auto isgate = _private::process_gate(line);
             if (isio.name != "") {
+                assert(isgate.type == "");
                 _circuit.add_net(isio.name, isio.type);
                 ionames.push_back(isio.name);
             }
             if (isgate.type != "") {
+                assert(isio.name == "");
                 std::string name = _private::gatename(gatecnt);
                 char port = 'a';
                 gatecnt++;
                 _circuit.add_module(name, isgate.type);
-                _circuit.add_connection(isgate.conns[0], name, "y");
+                _circuit.add_connection(name, isgate.conns[0], "y");
                 wire_declared[isgate.conns[0]] = false;
                 for (int i = 1; i < isgate.conns.size(); i++) {
-                    _circuit.add_connection(name, isgate.conns[i], std::string(1, port));
+                    _circuit.add_connection(isgate.conns[i], name, std::string(1, port));
                     wire_declared[isgate.conns[i]] = false;
                     port++;
                 }
